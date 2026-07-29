@@ -6,7 +6,10 @@ Ketika terjadi gangguan—seperti CPU spike, RAM penuh, disk habis dalam 24 jam,
 
 ---
 
-<img width="1917" height="900" alt="image" src="https://github.com/user-attachments/assets/87ec51e9-e6d3-48ee-b6dc-3528c803363d" />
+<img width="1917" height="902" alt="image" src="https://github.com/user-attachments/assets/5964b70d-3f60-426e-b583-1b4514878889" />
+<img width="1917" height="892" alt="image" src="https://github.com/user-attachments/assets/eb3f91b8-c381-461e-83f4-39d78e533a9e" />
+<img width="1917" height="897" alt="image" src="https://github.com/user-attachments/assets/266e6b4c-dcc2-4ef8-84b5-8f394ed8fcb6" />
+<img width="1917" height="900" alt="image" src="https://github.com/user-attachments/assets/845c7df4-3088-4d96-b0bf-db35596b034d" />
 
 ---
 
