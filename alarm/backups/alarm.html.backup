@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ALARM MONITOR</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/alarm.css">
+</head>
+<body>
+
+  <div id="armOverlay">
+    <div class="plate">🔔</div>
+    <h2>Alarm Monitor</h2>
+    <p>Tekan tombol di bawah untuk mengaktifkan panel dan mengizinkan suara alarm bunyi otomatis saat status berubah CRITICAL.</p>
+    <button id="armBtn">Aktifkan Panel</button>
+  </div>
+
+  <div class="rig">
+    <div class="panel" id="panel">
+      <div class="hazard-strip"></div>
+      <span class="rivet tl"></span><span class="rivet tr"></span>
+      <span class="rivet bl"></span><span class="rivet br"></span>
+
+      <div class="panel-head">
+        <div class="eyebrow">Pemantauan Server</div>
+        <div class="lamp-cluster">
+          <div class="lamp">
+            <span class="bulb on safe" id="lampDaya"></span>
+            <span class="lamp-label">Daya</span>
+          </div>
+          <div class="lamp">
+            <span class="bulb on safe" id="lampNet"></span>
+            <span class="lamp-label">Jaringan</span>
+          </div>
+          <div class="lamp">
+            <span class="bulb off" id="lampAlarm"></span>
+            <span class="lamp-label">Alarm</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="beacon-row">
+        <div class="beacon-mount">
+          <div class="beacon" id="beacon"></div>
+        </div>
+        <div class="status-text" id="txt" aria-live="polite">NORMAL</div>
+        <div class="updated" id="updated">menunggu data...</div>
+      </div>
+
+      <div class="meta-row">
+        <div class="meta-box">
+          <div class="eyebrow">Hari Tanpa Insiden</div>
+          <div class="odometer" id="counter"></div>
+        </div>
+        <div class="meta-box alertcount">
+          <div class="eyebrow">Alert Aktif</div>
+          <div class="odometer" id="activeCount"></div>
+        </div>
+      </div>
+
+      <div class="alert-list" id="alertList"></div>
+
+      <details class="history-details">
+        <summary>Riwayat Insiden</summary>
+        <div class="log-strip" id="logStrip">
+          <div class="log-empty">Memuat riwayat...</div>
+        </div>
+      </details>
+
+      <div class="warn-banner" id="warnBanner">
+        Suara diblokir browser. Klik tombol alarm merah sekali untuk mengizinkan audio.
+      </div>
+
+      <div class="controls">
+        <div class="rocker">
+          <div class="switch on" id="muteSwitch" role="switch" aria-checked="true" tabindex="0">
+            <div class="knob"></div>
+          </div>
+          <div class="eyebrow" id="muteLabel">Suara On</div>
+        </div>
+        <div class="test-col">
+          <div class="test-wrap" id="testBtnWrap">
+            <div class="test-guard"></div>
+            <button class="test-btn" id="testBtn" aria-label="Uji suara alarm"></button>
+          </div>
+          <div class="test-label">Uji Alarm</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <audio id="alarmSound" src="/static/alarm.mp3" loop></audio>
+  <script src="/static/js/alarm.js"></script>
+</body>
+</html>

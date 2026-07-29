@@ -1,0 +1,150 @@
+const body = document.body;
+const txt = document.getElementById('txt');
+const updated = document.getElementById('updated');
+const alertList = document.getElementById('alertList');
+const activeCount = document.getElementById('activeCount');
+const counter = document.getElementById('counter');
+const audio = document.getElementById('alarmSound');
+const muteSwitch = document.getElementById('muteSwitch');
+const muteLabel = document.getElementById('muteLabel');
+const testBtn = document.getElementById('testBtn');
+const warnBanner = document.getElementById('warnBanner');
+const armOverlay = document.getElementById('armOverlay');
+const armBtn = document.getElementById('armBtn');
+const logStrip = document.getElementById('logStrip');
+const lampNet = document.getElementById('lampNet');
+const lampAlarm = document.getElementById('lampAlarm');
+
+let muted = false;
+
+function timeAgo(ts){
+  const diff = Math.max(0, Math.floor(Date.now()/1000 - ts));
+  if (diff < 5) return "baru saja";
+  if (diff < 60) return diff + " detik lalu";
+  if (diff < 3600) return Math.floor(diff/60) + " menit lalu";
+  return Math.floor(diff/3600) + " jam lalu";
+}
+
+function fmtClock(ts){
+  const d = new Date(ts * 1000);
+  const pad = n => String(n).padStart(2,'0');
+  return pad(d.getHours()) + ':' + pad(d.getMinutes()) + ' · ' + pad(d.getDate()) + '/' + pad(d.getMonth()+1);
+}
+
+// Render a number as individual "mechanical counter" digit cells.
+function renderDigits(el, value, width){
+  const str = String(value).padStart(width, '0');
+  el.innerHTML = [...str].map(ch => `<span class="digit">${ch}</span>`).join('');
+}
+
+// Unlock trik: mainkan sebentar (muted) lalu pause, dipicu klik user,
+// supaya browser mengizinkan audio.play() otomatis lewat JS setelahnya.
+function unlockAudio(){
+  audio.muted = true;
+  audio.play().then(() => {
+    audio.pause();
+    audio.currentTime = 0;
+    audio.muted = false;
+    warnBanner.classList.remove('show');
+  }).catch(() => {});
+}
+
+armBtn.onclick = () => {
+  unlockAudio();
+  armOverlay.style.display = 'none';
+  checkStatus();
+  loadHistory();
+};
+
+async function checkStatus(){
+  try {
+    const res = await fetch('/status');
+    const data = await res.json();
+    lampNet.className = 'bulb on safe';
+
+    const alerts = data.alerts || [];
+    renderDigits(activeCount, alerts.length, 2);
+
+    if (data.status === 'CRITICAL') {
+      body.classList.add('critical');
+      txt.innerText = 'CRITICAL';
+      lampAlarm.className = 'bulb on critical';
+      if (!muted) {
+        audio.play().then(() => warnBanner.classList.remove('show'))
+                     .catch(() => warnBanner.classList.add('show'));
+      }
+      alertList.innerHTML = alerts.map((a,i) => `
+        <div class="alert-item">
+          <span class="tag">A${String(i+1).padStart(2,'0')}</span>
+          <div>
+            <div class="name">${a.name || 'Unknown'} ${a.instance ? '· ' + a.instance : ''}</div>
+            <div class="meta">${a.summary || ('severity: ' + (a.severity || 'critical'))}</div>
+          </div>
+        </div>
+      `).join('') || '<div class="alert-item"><div class="meta">Tidak ada detail alert</div></div>';
+    } else {
+      body.classList.remove('critical');
+      txt.innerText = 'NORMAL';
+      lampAlarm.className = 'bulb off';
+      audio.pause(); audio.currentTime = 0;
+      alertList.innerHTML = '';
+      warnBanner.classList.remove('show');
+    }
+
+    updated.innerText = 'update terakhir: ' + timeAgo(data.updated || Date.now()/1000);
+  } catch(e) {
+    lampNet.className = 'bulb on err';
+  }
+}
+
+async function loadHistory(){
+  try {
+    const res = await fetch('/history');
+    const data = await res.json();
+
+    if (data.length) {
+      const days = Math.floor((Date.now()/1000 - data[0].time) / 86400);
+      renderDigits(counter, days, 3);
+      logStrip.innerHTML = data.map(h => `
+        <div class="log-row">
+          <span class="t">${fmtClock(h.time)}</span>
+          <span class="n">${h.name || 'Unknown'}</span>
+          <span>${h.instance ? '· ' + h.instance : ''}</span>
+        </div>
+      `).join('');
+    } else {
+      counter.innerHTML = '<span class="digit">-</span><span class="digit">-</span><span class="digit">-</span>';
+      logStrip.innerHTML = '<div class="log-empty">Belum ada insiden tercatat.</div>';
+    }
+  } catch(e) {
+    logStrip.innerHTML = '<div class="log-empty">Gagal memuat riwayat.</div>';
+  }
+}
+
+function setMuted(v){
+  muted = v;
+  muteSwitch.classList.toggle('on', !muted);
+  muteSwitch.setAttribute('aria-checked', String(!muted));
+  muteLabel.innerText = muted ? 'Suara Off' : 'Suara On';
+  if (muted) { audio.pause(); audio.currentTime = 0; }
+}
+muteSwitch.addEventListener('click', () => setMuted(!muted));
+muteSwitch.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setMuted(!muted); }
+});
+
+testBtn.onclick = () => {
+  unlockAudio();
+  audio.currentTime = 0;
+  audio.loop = false;
+  audio.play().then(() => warnBanner.classList.remove('show'))
+               .catch(() => warnBanner.classList.add('show'));
+  audio.onended = () => { audio.loop = true; };
+};
+
+renderDigits(activeCount, 0, 2);
+counter.innerHTML = '<span class="digit">-</span><span class="digit">-</span><span class="digit">-</span>';
+setInterval(checkStatus, 2000);
+setInterval(loadHistory, 8000);
+checkStatus();
+loadHistory();

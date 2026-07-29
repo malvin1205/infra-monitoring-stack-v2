@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="InfraWatch — Real-time infrastructure monitoring and alert management">
+  <title>InfraWatch · Server Monitor</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/alarm.css') }}">
+  <script src="{{ url_for('static', filename='js/theme-switcher.js') }}"></script>
+</head>
+<body>
+
+  <!-- Ambient background -->
+  <div class="bg-noise" aria-hidden="true"></div>
+  <div class="bg-grid" aria-hidden="true"></div>
+  <div class="bg-glow bg-glow-teal" aria-hidden="true"></div>
+  <div class="bg-glow bg-glow-red" aria-hidden="true"></div>
+
+  <!-- ═══════════════════════════════════════════
+       SPLASH / INIT SCREEN
+  ════════════════════════════════════════════ -->
+  <div id="initOverlay" role="dialog" aria-modal="true" aria-label="Welcome screen">
+    <div class="splash-card">
+      <div class="splash-logo" aria-hidden="true">
+        <div class="logo-rings">
+          <span class="lr lr1"></span>
+          <span class="lr lr2"></span>
+          <span class="lr lr3"></span>
+        </div>
+        <div class="logo-pulse"></div>
+      </div>
+      <div class="splash-brand">InfraWatch</div>
+      <h1 class="splash-title">Server Monitor</h1>
+      <p class="splash-desc">Real-time alert feed and incident log for every instance you run. Click below to enable audio and open the console.</p>
+      <button id="initBtn" type="button" class="splash-btn">
+        <span class="splash-btn-icon" aria-hidden="true">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5"/><path d="M6 5.5l5 2.5-5 2.5V5.5z" fill="currentColor"/></svg>
+        </span>
+        Launch Console
+      </button>
+      <p class="splash-note">Polling every 2s · History every 8s</p>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       MAIN DASHBOARD
+  ════════════════════════════════════════════ -->
+  <div id="dashboard" class="app" hidden>
+
+    <!-- ── Sidebar ── -->
+    <aside class="sidebar" aria-label="Navigation sidebar">
+      <div class="sidebar-logo" aria-label="InfraWatch">
+        <div class="sidebar-logo-icon" aria-hidden="true">
+          <div class="sl-rings">
+            <span class="sl-ring sl-r1"></span>
+            <span class="sl-ring sl-r2"></span>
+          </div>
+          <div class="sl-dot"></div>
+        </div>
+        <span class="sidebar-brand">InfraWatch</span>
+      </div>
+
+      <nav class="sidebar-nav" aria-label="Main navigation">
+        <button class="nav-item nav-item-active" data-page="dashboard" aria-current="page" id="nav-dashboard">
+          <svg class="nav-icon" width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><rect x="1" y="1" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="11" y="1" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="1" y="11" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="11" y="11" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.5"/></svg>
+          <span>Dashboard</span>
+        </button>
+        <button class="nav-item" data-page="instances" id="nav-instances">
+          <svg class="nav-icon" width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M9 1.5L2 6v10h14V6L9 1.5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><rect x="6.5" y="10" width="5" height="6" rx="1" stroke="currentColor" stroke-width="1.5"/></svg>
+          <span>Instances</span>
+          <span class="nav-badge" id="instancesBadge" style="display:none">0</span>
+        </button>
+        <button class="nav-item" data-page="logs" id="nav-logs">
+          <svg class="nav-icon" width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M3 9h12M3 5h12M3 13h7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          <span>Logs</span>
+          <span class="nav-badge nav-badge-new" id="logsBadge" style="display:none">NEW</span>
+        </button>
+        <button class="nav-item" data-page="history" id="nav-history">
+          <svg class="nav-icon" width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><circle cx="9" cy="9" r="7.5" stroke="currentColor" stroke-width="1.5"/><path d="M9 5v4l2.5 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          <span>History</span>
+          <span class="nav-badge" id="historyNavBadge" style="display:none">0</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="sidebar-theme-wrap">
+          <button class="theme-toggle-btn sidebar-theme-btn" id="sidebarThemeBtn" type="button" aria-label="Toggle theme mode">
+            <span class="sidebar-theme-label">
+              <span class="theme-btn-icon" id="sidebarThemeIcon">🌙</span>
+              <span class="sidebar-theme-text" id="sidebarThemeText">Dark Mode</span>
+            </span>
+          </button>
+        </div>
+        <div class="conn-row">
+          <span class="conn-dot" id="netIndicator" aria-label="Network status"></span>
+          <span class="conn-label">Network</span>
+        </div>
+        <div class="conn-row">
+          <span class="conn-dot" id="healthIndicator" aria-label="System health"></span>
+          <span class="conn-label">Health</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ── Main Content ── -->
+    <main class="main-content" aria-label="Dashboard content">
+
+      <!-- Top Bar -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <h1 class="topbar-title" id="pageTitle">System Status</h1>
+          <p class="topbar-sub" id="subtitle">System monitoring active</p>
+        </div>
+        <div class="topbar-right">
+          <button class="theme-toggle-btn" id="themeToggleBtn" type="button" aria-label="Toggle theme mode">
+            <span class="theme-btn-icon" id="currentThemeIcon">🌙</span>
+            <span id="currentThemeLabel">Dark Mode</span>
+          </button>
+          <div class="last-update-chip" id="lastUpdateChip">
+            <span class="lu-dot" aria-hidden="true"></span>
+            <span id="statusMeta">Checking…</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- ════════════════════════════════
+           PAGE: DASHBOARD
+      ═════════════════════════════════ -->
+      <div id="page-dashboard" class="page-content">
+
+        <!-- ── Hero Status ── -->
+        <section class="hero-section" aria-label="Current system status">
+          <div class="hero-card" id="heroCard">
+            <div class="hero-scope" aria-hidden="true">
+              <div class="hs-grid"></div>
+              <div class="hs-rings" id="beaconRing">
+                <span class="hs-ring hs-r1"></span>
+                <span class="hs-ring hs-r2"></span>
+                <span class="hs-ring hs-r3"></span>
+                <span class="hs-sweep"></span>
+              </div>
+              <div class="hs-core" id="beaconCore"></div>
+            </div>
+            <div class="hero-status">
+              <div class="hero-label">Current Status</div>
+              <div class="hero-value" id="statusText" aria-live="polite" aria-atomic="true">NORMAL</div>
+              <div class="hero-desc" id="heroDesc">All systems operational</div>
+            </div>
+            <div class="hero-sep" aria-hidden="true"></div>
+            <div class="hero-actions">
+              <label class="sound-toggle" title="Toggle alarm sound">
+                <input type="checkbox" id="soundToggle" checked aria-label="Toggle alarm sound">
+                <span class="st-track"></span>
+                <span class="st-label" id="soundLabel">Sound on</span>
+              </label>
+              <button id="testBtn" class="test-btn" type="button" aria-label="Test alarm sound">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2 4.5h2l3-3v10l-3-3H2V4.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M10 5c.8.5 1.3 1.2 1.3 2S10.8 8.5 10 9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+                Test alarm
+              </button>
+            </div>
+            <div id="audioWarning" class="audio-warning hidden" role="alert">
+              ⚠ Browser blocked audio — tap here to enable
+            </div>
+          </div>
+        </section>
+
+        <!-- ── Metric Tiles ── -->
+        <section class="metrics-grid" aria-label="System metrics">
+          <div class="metric-tile">
+            <div class="mt-icon mt-icon-red" aria-hidden="true">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 3L3 16h14L10 3z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M10 9v3M10 13.5v.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </div>
+            <div class="mt-body">
+              <div class="mt-label">Active Alerts</div>
+              <div class="mt-value" id="alertCount">00</div>
+            </div>
+            <div class="mt-bar" aria-hidden="true"><div class="mt-bar-fill mt-bar-red" id="alertBar"></div></div>
+          </div>
+
+          <div class="metric-tile">
+            <div class="mt-icon mt-icon-teal" aria-hidden="true">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="1.5"/><path d="M10 6v4l2.5 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </div>
+            <div class="mt-body">
+              <div class="mt-label">Days Without Incident</div>
+              <div class="mt-value" id="uptimeDays">—</div>
+            </div>
+            <div class="mt-bar" aria-hidden="true"><div class="mt-bar-fill mt-bar-teal" id="uptimeBar" style="width:0%"></div></div>
+          </div>
+
+          <div class="metric-tile">
+            <div class="mt-icon mt-icon-yellow" aria-hidden="true">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 14h12M4 10h8M4 6h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </div>
+            <div class="mt-body">
+              <div class="mt-label">Incidents This Month</div>
+              <div class="mt-value" id="incidentCount">00</div>
+            </div>
+            <div class="mt-bar" aria-hidden="true"><div class="mt-bar-fill mt-bar-yellow" id="incidentBar"></div></div>
+          </div>
+        </section>
+
+        <!-- ── Active Alerts ── -->
+        <section class="panel" aria-label="Active alerts" aria-live="polite">
+          <div class="panel-head">
+            <div class="panel-title-wrap">
+              <span class="panel-dot panel-dot-red" aria-hidden="true"></span>
+              <h2 class="panel-title">Active Alerts</h2>
+            </div>
+            <span class="badge badge-red badge-hidden" id="alertBadge" aria-label="Number of active alerts">0</span>
+          </div>
+          <div class="panel-body" id="alertsList">
+            <div class="empty-state">
+              <div class="es-icon" aria-hidden="true">
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="13" stroke="currentColor" stroke-width="1.5"/><path d="M16 10v6M16 19v1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              </div>
+              <div class="es-text">No active alerts — everything is quiet</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── Recent History (mini) ── -->
+        <section class="panel" aria-label="Recent incidents">
+          <div class="panel-head">
+            <div class="panel-title-wrap">
+              <span class="panel-dot panel-dot-yellow" aria-hidden="true"></span>
+              <h2 class="panel-title">Recent Incidents</h2>
+            </div>
+            <span class="badge badge-dim" id="historyCount">0</span>
+          </div>
+          <div class="history-body">
+            <div class="history-head" aria-hidden="true">
+              <span>Time</span>
+              <span>Alert Name</span>
+              <span>Instance</span>
+              <span>Severity</span>
+            </div>
+            <div class="history-rows" id="historyTable">
+              <div class="empty-state">
+                <div class="es-icon" aria-hidden="true">
+                  <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><path d="M6 22V8a2 2 0 012-2h12a2 2 0 012 2v14" stroke="currentColor" stroke-width="1.5"/><path d="M3 22h22M10 11h8M10 15h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                </div>
+                <div class="es-text">No incidents recorded yet</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </div><!-- /page-dashboard -->
+
+      <!-- ════════════════════════════════
+           PAGE: INSTANCES
+      ═════════════════════════════════ -->
+      <div id="page-instances" class="page-content" hidden>
+
+        <!-- Toolbar -->
+        <div class="page-toolbar">
+          <div class="toolbar-left">
+            <div class="search-box">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-width="1.3"/><path d="M9.5 9.5l3 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+              <input type="text" id="instanceSearch" placeholder="Search instances…" autocomplete="off">
+            </div>
+            <div class="filter-group" id="instanceJobFilter">
+              <button class="filter-btn filter-btn-active" data-filter="all">All</button>
+            </div>
+          </div>
+          <div class="toolbar-right">
+            <select id="scrapeIntervalSelect" class="interval-select" title="Set Responsive Scrape Interval">
+              <option value="1000">⚡ 1s (Realtime)</option>
+              <option value="2000" selected>⚡ 2s (Fast)</option>
+              <option value="5000">5s (Standard)</option>
+              <option value="10000">10s (Eco)</option>
+            </select>
+            <button class="icon-btn" id="refreshInstances" title="Refresh instances">
+              <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M13 7.5A5.5 5.5 0 112.5 5M2.5 2v3h3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <span class="toolbar-meta" id="instancesMeta">—</span>
+          </div>
+        </div>
+
+        <!-- Stats row -->
+        <div class="inst-stats" id="instStats">
+          <div class="inst-stat">
+            <div class="inst-stat-val" id="instTotal">—</div>
+            <div class="inst-stat-label">Total</div>
+          </div>
+          <div class="inst-stat inst-stat-up">
+            <div class="inst-stat-val" id="instUp">—</div>
+            <div class="inst-stat-label">Up</div>
+          </div>
+          <div class="inst-stat inst-stat-down">
+            <div class="inst-stat-val" id="instDown">—</div>
+            <div class="inst-stat-label">Down</div>
+          </div>
+          <div class="inst-stat inst-stat-unknown">
+            <div class="inst-stat-val" id="instUnknown">—</div>
+            <div class="inst-stat-label">Unknown</div>
+          </div>
+        </div>
+
+        <!-- Node Exporter Host System Metrics -->
+        <div class="panel node-panel">
+          <div class="panel-head">
+            <div class="panel-title-wrap">
+              <span class="panel-dot panel-dot-teal" aria-hidden="true"></span>
+              <h2 class="panel-title">Node Exporter · Host Hardware Metrics</h2>
+            </div>
+            <span class="badge badge-dim">node_exporter:9100</span>
+          </div>
+          <div class="node-metrics-grid">
+            <div class="node-metric-box">
+              <div class="nm-head">
+                <span class="nm-label">CPU Usage</span>
+                <span class="nm-val" id="nodeCpuVal">—</span>
+              </div>
+              <div class="nm-bar"><div class="nm-bar-fill nm-bar-cpu" id="nodeCpuBar" style="width: 0%"></div></div>
+            </div>
+
+            <div class="node-metric-box">
+              <div class="nm-head">
+                <span class="nm-label">RAM Usage</span>
+                <span class="nm-val" id="nodeRamVal">—</span>
+              </div>
+              <div class="nm-bar"><div class="nm-bar-fill nm-bar-ram" id="nodeRamBar" style="width: 0%"></div></div>
+            </div>
+
+            <div class="node-metric-box">
+              <div class="nm-head">
+                <span class="nm-label">Disk Storage</span>
+                <span class="nm-val" id="nodeDiskVal">—</span>
+              </div>
+              <div class="nm-bar"><div class="nm-bar-fill nm-bar-disk" id="nodeDiskBar" style="width: 0%"></div></div>
+            </div>
+
+            <div class="node-metric-box">
+              <div class="nm-head">
+                <span class="nm-label">Network Traffic</span>
+                <span class="nm-val" id="nodeNetVal">—</span>
+              </div>
+              <div class="nm-sub" id="nodeNetSub">In / Out Rate</div>
+            </div>
+
+            <div class="node-metric-box">
+              <div class="nm-head">
+                <span class="nm-label">Host Uptime</span>
+                <span class="nm-val" id="nodeUptimeVal">—</span>
+              </div>
+              <div class="nm-sub">System Running Time</div>
+            </div>
+
+            <div class="node-metric-box">
+              <div class="nm-head">
+                <span class="nm-label">Load Avg (1m)</span>
+                <span class="nm-val" id="nodeLoadVal">—</span>
+              </div>
+              <div class="nm-sub">CPU Task Queue</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Table -->
+        <div class="panel panel-flush">
+          <div class="panel-head">
+            <div class="panel-title-wrap">
+              <span class="panel-dot panel-dot-teal" aria-hidden="true"></span>
+              <h2 class="panel-title">Web Scrape Targets</h2>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <button id="openAddTargetModalBtn" class="add-target-btn" type="button">
+                <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                <span>Add Web Target</span>
+              </button>
+              <span class="badge badge-dim" id="instanceCount">0</span>
+            </div>
+          </div>
+          <div class="inst-table-wrap">
+            <table class="inst-table" id="instancesTable" aria-label="Scrape targets table">
+              <thead>
+                <tr>
+                  <th>Status</th>
+                  <th>Instance</th>
+                  <th>Job</th>
+                  <th>Latency</th>
+                  <th>Status Code</th>
+                  <th>Last Scrape</th>
+                  <th>Details / Error</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="instancesBody">
+                <tr><td colspan="8" class="table-empty">
+                  <div class="empty-state">
+                    <div class="es-icon" aria-hidden="true">
+                      <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><path d="M14 2C7.37 2 2 7.37 2 14s5.37 12 12 12 12-5.37 12-12S20.63 2 14 2z" stroke="currentColor" stroke-width="1.5"/><path d="M14 8v6M14 17v1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                    </div>
+                    <div class="es-text">Loading web targets & metrics…</div>
+                  </div>
+                </td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Error card -->
+        <div class="inst-error hidden" id="instancesError">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 3L3 16h14L10 3z" stroke="currentColor" stroke-width="1.5"/><path d="M10 9v3M10 14v.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          <span id="instancesErrorMsg">Cannot reach Prometheus</span>
+        </div>
+
+      </div><!-- /page-instances -->
+
+      <!-- ════════════════════════════════
+           PAGE: LOGS
+      ═════════════════════════════════ -->
+      <div id="page-logs" class="page-content" hidden>
+
+        <!-- Toolbar -->
+        <div class="page-toolbar">
+          <div class="toolbar-left">
+            <div class="search-box">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-width="1.3"/><path d="M9.5 9.5l3 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+              <input type="text" id="logSearch" placeholder="Filter logs…" autocomplete="off">
+            </div>
+            <div class="filter-group">
+              <button class="filter-btn filter-btn-active" data-log-filter="all">All</button>
+              <button class="filter-btn" data-log-filter="firing">Firing</button>
+              <button class="filter-btn" data-log-filter="resolved">Resolved</button>
+            </div>
+          </div>
+          <div class="toolbar-right">
+            <label class="log-live-label">
+              <input type="checkbox" id="logLiveToggle" checked>
+              <span class="live-dot"></span>
+              <span>Live</span>
+            </label>
+            <button class="icon-btn" id="clearLogs" title="Clear logs">
+              <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M3 4h9M5 4V3h5v1M6 7v4M9 7v4M4 4l.5 8h6l.5-8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Log stream -->
+        <div class="log-panel">
+          <div class="log-header">
+            <span class="log-header-time">Time</span>
+            <span class="log-header-event">Event</span>
+            <span class="log-header-name">Alert</span>
+            <span class="log-header-inst">Instance</span>
+            <span class="log-header-sev">Severity</span>
+            <span class="log-header-msg">Summary</span>
+          </div>
+          <div class="log-stream" id="logStream" role="log" aria-live="polite" aria-label="Alert log stream">
+            <div class="empty-state">
+              <div class="es-icon" aria-hidden="true">
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none"><path d="M4 26V8a2 2 0 012-2h20a2 2 0 012 2v18" stroke="currentColor" stroke-width="1.5"/><path d="M2 26h28M10 13h12M10 18h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              </div>
+              <div class="es-text">No log entries yet — waiting for webhooks…</div>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /page-logs -->
+
+      <!-- ════════════════════════════════
+           PAGE: HISTORY
+      ═════════════════════════════════ -->
+      <div id="page-history" class="page-content" hidden>
+
+        <!-- Toolbar -->
+        <div class="page-toolbar">
+          <div class="toolbar-left">
+            <div class="search-box">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-width="1.3"/><path d="M9.5 9.5l3 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+              <input type="text" id="historySearch" placeholder="Search incidents…" autocomplete="off">
+            </div>
+            <div class="filter-group">
+              <button class="filter-btn filter-btn-active" data-hist-filter="all">All</button>
+              <button class="filter-btn" data-hist-filter="critical">Critical</button>
+              <button class="filter-btn" data-hist-filter="warning">Warning</button>
+            </div>
+          </div>
+          <div class="toolbar-right">
+            <button class="icon-btn" id="exportHistory" title="Export CSV">
+              <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M7.5 2v8M4.5 7l3 3 3-3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 11v2h11v-2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <span class="toolbar-meta" id="historyMeta">—</span>
+          </div>
+        </div>
+
+        <!-- Stats row -->
+        <div class="hist-stats">
+          <div class="hist-stat">
+            <div class="hist-stat-val" id="histTotal">—</div>
+            <div class="hist-stat-label">Total Incidents</div>
+          </div>
+          <div class="hist-stat">
+            <div class="hist-stat-val" id="histThisMonth">—</div>
+            <div class="hist-stat-label">This Month</div>
+          </div>
+          <div class="hist-stat">
+            <div class="hist-stat-val hist-stat-crit" id="histCritical">—</div>
+            <div class="hist-stat-label">Critical</div>
+          </div>
+          <div class="hist-stat">
+            <div class="hist-stat-val hist-stat-warn" id="histWarning">—</div>
+            <div class="hist-stat-label">Warning</div>
+          </div>
+        </div>
+
+        <!-- Full history table -->
+        <div class="panel panel-flush">
+          <div class="panel-head">
+            <div class="panel-title-wrap">
+              <span class="panel-dot panel-dot-yellow" aria-hidden="true"></span>
+              <h2 class="panel-title">Incident Log</h2>
+            </div>
+            <span class="badge badge-dim" id="historyBadge">0</span>
+          </div>
+          <div class="history-body">
+            <div class="history-head history-head-full" aria-hidden="true">
+              <span>Time</span>
+              <span>Alert Name</span>
+              <span>Instance</span>
+              <span>Severity</span>
+              <span>Summary</span>
+            </div>
+            <div class="history-rows history-rows-full" id="historyFullTable">
+              <div class="empty-state">
+                <div class="es-icon" aria-hidden="true">
+                  <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><path d="M6 22V8a2 2 0 012-2h12a2 2 0 012 2v14" stroke="currentColor" stroke-width="1.5"/><path d="M3 22h22M10 11h8M10 15h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                </div>
+                <div class="es-text">No incidents recorded yet</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /page-history -->
+
+    </main>
+  </div>
+
+  <!-- Mobile bottom navigation -->
+  <nav class="mobile-nav" aria-label="Mobile navigation" hidden>
+    <button class="mobile-nav-item mobile-nav-active" data-page="dashboard" aria-current="page">
+      <svg width="20" height="20" viewBox="0 0 18 18" fill="none" aria-hidden="true"><rect x="1" y="1" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="11" y="1" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="1" y="11" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="11" y="11" width="6" height="6" rx="1.5" stroke="currentColor" stroke-width="1.5"/></svg>
+      <span>Home</span>
+    </button>
+    <button class="mobile-nav-item" data-page="instances">
+      <svg width="20" height="20" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M9 1.5L2 6v10h14V6L9 1.5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><rect x="6.5" y="10" width="5" height="6" rx="1" stroke="currentColor" stroke-width="1.5"/></svg>
+      <span>Targets</span>
+      <span class="mobile-nav-badge" id="mobileInstancesBadge" hidden>0</span>
+    </button>
+    <button class="mobile-nav-item" data-page="logs">
+      <svg width="20" height="20" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M3 9h12M3 5h12M3 13h7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <span>Logs</span>
+      <span class="mobile-nav-badge mobile-nav-badge-new" id="mobileLogsBadge" hidden>NEW</span>
+    </button>
+    <button class="mobile-nav-item" data-page="history">
+      <svg width="20" height="20" viewBox="0 0 18 18" fill="none" aria-hidden="true"><circle cx="9" cy="9" r="7.5" stroke="currentColor" stroke-width="1.5"/><path d="M9 5v4l2.5 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <span>History</span>
+    </button>
+  </nav>
+
+
+
+  <!-- Add Web Target Modal -->
+  <div id="addTargetModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3 class="modal-title" id="modalTitle">Add Web Target</h3>
+        <button id="closeAddTargetModal" class="modal-close-btn" type="button" aria-label="Close modal">&times;</button>
+      </div>
+      <form id="addTargetForm" class="modal-form">
+        <div class="form-group">
+          <label for="targetUrlInput" class="form-label">Website / Target URL</label>
+          <input type="text" id="targetUrlInput" class="form-input" placeholder="e.g. https://google.com or http://nginx" required autocomplete="off">
+          <span class="form-help">Enter a valid HTTP/HTTPS URL or container name to monitor via Blackbox exporter.</span>
+        </div>
+        <div id="addTargetError" class="form-error hidden"></div>
+        <div class="modal-actions">
+          <button type="button" id="cancelAddTargetBtn" class="btn btn-secondary">Cancel</button>
+          <button type="submit" id="submitAddTargetBtn" class="btn btn-primary">
+            <span>Add Target</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Hidden audio -->
+  <audio id="alarmAudio" src="{{ url_for('static', filename='alarm.mp3') }}" preload="auto"></audio>
+
+  <script src="{{ url_for('static', filename='js/alarm.js') }}"></script>
+</body>
+</html>

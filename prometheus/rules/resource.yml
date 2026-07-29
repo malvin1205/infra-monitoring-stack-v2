@@ -1,0 +1,190 @@
+groups:
+  - name: node_resource_alerts
+    interval: 5s
+    rules:
+
+      # =========================
+      # CPU (Responsive Multi-Tier)
+      # =========================
+
+      - alert: CPUUsageWarning
+        expr: |
+          100 - (avg by(instance)(
+            irate(node_cpu_seconds_total{mode="idle"}[1m])
+          ) * 100) > 80
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "CPU Warning {{ $labels.instance }}"
+          description: "CPU usage exceeds 80% for 1 minute."
+
+      - alert: HighCPU
+        expr: |
+          100 - (avg by(instance)(
+            irate(node_cpu_seconds_total{mode="idle"}[1m])
+          ) * 100) > 95
+        for: 15s
+        labels:
+          severity: critical
+        annotations:
+          summary: "CPU Critical {{ $labels.instance }}"
+          description: "CPU usage exceeds 95% for 15 seconds."
+
+      - alert: CPUSaturationLoadHigh
+        expr: |
+          node_load1 / count by(instance)(node_cpu_seconds_total{mode="idle"}) > 2.0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "CPU Load Saturation {{ $labels.instance }}"
+          description: "System 1-minute load average exceeds 2x CPU core count for 30 seconds."
+
+
+      # =========================
+      # MEMORY (Responsive Multi-Tier)
+      # =========================
+
+      - alert: MemoryUsageWarning
+        expr: |
+          (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100 > 80
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Memory Warning {{ $labels.instance }}"
+          description: "RAM usage exceeds 80% for 1 minute."
+
+      - alert: HighMemoryUsage
+        expr: |
+          (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100 > 92
+        for: 15s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Memory Critical {{ $labels.instance }}"
+          description: "RAM usage exceeds 92% for 15 seconds."
+
+      - alert: SwapUsageHigh
+        expr: |
+          (1 - node_memory_SwapFree_bytes / node_memory_SwapTotal_bytes) * 100 > 80
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Swap Memory High {{ $labels.instance }}"
+          description: "Swap memory usage exceeds 80% for 1 minute."
+
+
+      # =========================
+      # DISK SPACE & STORAGE (Predictive + Thresholds)
+      # =========================
+
+      - alert: DiskSpaceWarning
+        expr: |
+          (node_filesystem_avail_bytes{mountpoint=~"/|/host|/rootfs", fstype!="tmpfs"} / node_filesystem_size_bytes{mountpoint=~"/|/host|/rootfs", fstype!="tmpfs"}) * 100 < 15
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Disk Space Warning {{ $labels.instance }}"
+          description: "Free disk space is below 15%."
+
+      - alert: DiskSpaceLow
+        expr: |
+          (node_filesystem_avail_bytes{mountpoint=~"/|/host|/rootfs", fstype!="tmpfs"} / node_filesystem_size_bytes{mountpoint=~"/|/host|/rootfs", fstype!="tmpfs"}) * 100 < 5
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Disk Space Critical {{ $labels.instance }}"
+          description: "Free disk space is below 5%."
+
+      - alert: DiskFillPredictive24h
+        expr: |
+          predict_linear(node_filesystem_avail_bytes{mountpoint=~"/|/host|/rootfs", fstype!="tmpfs"}[1h], 86400) < 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Predictive Disk Exhaustion {{ $labels.instance }}"
+          description: "Disk is predicted to run out of free space within 24 hours based on recent fill rate."
+
+      - alert: DiskInodeExhaustion
+        expr: |
+          (node_filesystem_files_free{mountpoint=~"/|/host|/rootfs", fstype!="tmpfs"} / node_filesystem_files{mountpoint=~"/|/host|/rootfs", fstype!="tmpfs"}) * 100 < 10
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Inode Exhaustion Warning {{ $labels.instance }}"
+          description: "Free filesystem inodes are below 10%."
+
+
+      # =========================
+      # DISK IO
+      # =========================
+
+      - alert: DiskIOBusy
+        expr: |
+          rate(node_disk_io_time_seconds_total[1m]) > 0.9
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Disk I/O High {{ $labels.instance }}"
+          description: "Disk I/O utilization exceeds 90% for 1 minute."
+
+
+      # =========================
+      # NETWORK
+      # =========================
+
+      - alert: NetworkReceiveHigh
+        expr: |
+          rate(node_network_receive_bytes_total{device!="lo"}[1m]) > 20971520
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Network Receive High {{ $labels.instance }}"
+          description: "Download traffic exceeds 20MB/s for 1 minute."
+
+      - alert: NetworkErrors
+        expr: |
+          rate(node_network_receive_errs_total{device!="lo"}[1m]) > 0
+          OR
+          rate(node_network_transmit_errs_total{device!="lo"}[1m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Network Packet Errors {{ $labels.instance }}"
+          description: "Packet errors detected on network interface."
+
+
+      # =========================
+      # PROMETHEUS / NODE TARGET (Instant Alerting)
+      # =========================
+
+      - alert: NodeExporterDown
+        expr: |
+          up{job="node"} == 0
+        for: 15s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Node Exporter Down {{ $labels.instance }}"
+          description: "Prometheus failed to scrape Node Exporter for 15 seconds."
+
+      - alert: PrometheusTargetDown
+        expr: |
+          up == 0
+        for: 15s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Target Down {{ $labels.instance }}"
+          description: "Prometheus failed to scrape monitoring target for 15 seconds."
+

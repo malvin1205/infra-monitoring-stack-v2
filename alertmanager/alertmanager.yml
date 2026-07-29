@@ -1,0 +1,28 @@
+route:
+  receiver: "python-webhook"
+  group_by: ['alertname', 'instance', 'severity']
+  group_wait: 0s
+  group_interval: 2s
+  repeat_interval: 5m
+
+inhibit_rules:
+  # Inhibit all resource warning/critical alerts if NodeExporterDown is firing on the same instance
+  - source_matchers:
+      - alertname = "NodeExporterDown"
+    target_matchers:
+      - alertname =~ "CPUUsageWarning|HighCPU|CPUSaturationLoadHigh|MemoryUsageWarning|HighMemoryUsage|SwapUsageHigh|DiskSpaceWarning|DiskSpaceLow|DiskFillPredictive24h|DiskInodeExhaustion|DiskIOBusy|NetworkReceiveHigh|NetworkErrors"
+    equal: ['instance']
+
+  # Inhibit target down warnings if PrometheusTargetDown is already firing
+  - source_matchers:
+      - alertname = "PrometheusTargetDown"
+    target_matchers:
+      - severity = "warning"
+    equal: ['instance']
+
+receivers:
+  - name: "python-webhook"
+    webhook_configs:
+      - url: "http://alarm:5000/webhook"
+        send_resolved: true
+

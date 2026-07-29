@@ -1,0 +1,139 @@
+version: "3.8"
+
+networks:
+  monitoring:
+    driver: bridge
+
+volumes:
+  prometheus_data: {}
+  grafana_data: {}
+
+services:
+  # ------------------------------------------------------------------
+  # Website yang dimonitor (pengganti "nginx (website)" di VM asli)
+  # ------------------------------------------------------------------
+  nginx:
+    image: nginx:stable
+    container_name: nginx
+    restart: always
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx/html:/usr/share/nginx/html:ro
+    networks:
+      - monitoring
+
+  # ------------------------------------------------------------------
+  # Node Exporter - CPU/RAM/Disk/Network HOST (bukan container)
+  # Mount /proc, /sys, / dari host supaya metric yang keluar adalah
+  # metric mesin host, bukan metric container itu sendiri.
+  # ------------------------------------------------------------------
+  node_exporter:
+    image: prom/node-exporter:v1.8.2
+    container_name: node_exporter
+    restart: always
+    pid: host
+    command:
+      - "--path.rootfs=/host"
+      - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|etc)($$|/)"
+    volumes:
+      - /:/host:ro,rslave
+    ports:
+      - "9100:9100"
+    networks:
+      - monitoring
+
+  # ------------------------------------------------------------------
+  # Blackbox Exporter - probe UP/DOWN website
+  # ------------------------------------------------------------------
+  blackbox_exporter:
+    image: prom/blackbox-exporter:v0.25.0
+    container_name: blackbox_exporter
+    restart: always
+    volumes:
+      - ./blackbox/blackbox.yml:/etc/blackbox_exporter/blackbox.yml:ro
+    command:
+      - "--config.file=/etc/blackbox_exporter/blackbox.yml"
+    ports:
+      - "9115:9115"
+    networks:
+      - monitoring
+
+  # ------------------------------------------------------------------
+  # Prometheus
+  # ------------------------------------------------------------------
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: prometheus
+    restart: always
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/rules:/etc/prometheus/rules:ro
+      - ./prometheus/targets:/etc/prometheus/targets
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.listen-address=:9090"
+    ports:
+      - "9090:9090"
+    depends_on:
+      - node_exporter
+      - blackbox_exporter
+      - alertmanager
+    networks:
+      - monitoring
+
+  # ------------------------------------------------------------------
+  # Alertmanager
+  # ------------------------------------------------------------------
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: alertmanager
+    restart: always
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "9093:9093"
+    networks:
+      - monitoring
+
+  # ------------------------------------------------------------------
+  # Grafana
+  # ------------------------------------------------------------------
+  grafana:
+    image: grafana/grafana:11.1.0
+    container_name: grafana
+    restart: always
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - monitoring
+
+  # ------------------------------------------------------------------
+  # Alarm program
+  # ------------------------------------------------------------------
+  alarm:
+    build: ./alarm
+    container_name: alarm
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./alarm:/app
+      - ./prometheus/targets:/app/targets
+    networks:
+      - monitoring
+

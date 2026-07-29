@@ -1,0 +1,79 @@
+groups:
+  - name: website_alerts
+    interval: 5s
+    rules:
+
+      # =========================
+      # WEBSITE AVAILABILITY
+      # =========================
+
+      - alert: WebsiteDown
+        expr: probe_success == 0
+        for: 10s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Website DOWN {{ $labels.instance }}"
+          description: "Blackbox exporter failed to probe website for 10 seconds."
+
+
+      # =========================
+      # HTTP RESPONSE TIME
+      # =========================
+
+      - alert: WebsiteSlowResponse
+        expr: probe_http_duration_seconds > 3
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: "Website Latency High {{ $labels.instance }}"
+          description: "Website response time exceeds 3 seconds."
+
+
+      # =========================
+      # SSL CERTIFICATE
+      # =========================
+
+      - alert: SSLCertificateExpiringSoon
+        expr: |
+          probe_ssl_earliest_cert_expiry
+          - time() < 604800
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "SSL Certificate Expiring {{ $labels.instance }}"
+          description: "SSL certificate expires in less than 7 days."
+
+
+      # =========================
+      # HTTP STATUS CODE
+      # =========================
+
+      - alert: WebsiteHTTPError
+        expr: |
+          probe_http_status_code >= 500
+        for: 15s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Website HTTP Error {{ $labels.instance }}"
+          description: "Website returned 5xx server error."
+
+
+      # =========================
+      # DOMAIN DNS CHECK
+      # =========================
+
+      - alert: DNSLookupFailed
+        expr: |
+          probe_success == 0
+          and probe_dns_lookup_time_seconds == 0
+        for: 15s
+        labels:
+          severity: warning
+        annotations:
+          summary: "DNS Resolution Failed {{ $labels.instance }}"
+          description: "Blackbox failed to resolve domain name."
+
