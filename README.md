@@ -14,8 +14,6 @@ Ketika terjadi gangguan—seperti CPU spike, RAM penuh, disk habis dalam 24 jam,
 
 ---
 
-• Stack ini adalah sistem “penjaga kesehatan” server dan website yang berjalan otomatis dalam Docker.
-
   Alur sederhananya:
 
   Server & Website
