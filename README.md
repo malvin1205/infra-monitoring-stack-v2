@@ -57,13 +57,6 @@ Ketika terjadi gangguan—seperti CPU spike, RAM penuh, disk habis dalam 24 jam,
   - Nginx
     Contoh website/web server yang dipantau oleh sistem. Dalam implementasi nyata, ini bisa diganti atau ditambah dengan website produksi.
 
-  Kalimat singkat untuk presentasi:
-
-  > “Sistem ini bekerja seperti pusat keamanan digital. Sensor mengambil kondisi server dan website, Prometheus menganalisis data tersebut secara real-time,
-  > Alertmanager menyaring peringatan, lalu Grafana dan InfraWatch menampilkan kondisi serta membunyikan alarm jika ada gangguan.”
-
-  Nilai utamanya: masalah seperti website down, CPU terlalu tinggi, RAM penuh, atau disk hampir habis dapat dideteksi cepat—sekitar hitungan detik—sebelum
-  berdampak lebih besar ke pengguna.
 
 ---
 
