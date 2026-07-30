@@ -14,6 +14,61 @@ Ketika terjadi gangguan—seperti CPU spike, RAM penuh, disk habis dalam 24 jam,
 
 ---
 
+• Stack ini adalah sistem “penjaga kesehatan” server dan website yang berjalan otomatis dalam Docker.
+
+  Alur sederhananya:
+
+  Server & Website
+        ↓
+  Pengumpul data
+  (Node Exporter + Blackbox Exporter)
+        ↓
+  Prometheus: menyimpan dan mengecek kondisi
+        ↓
+  Alertmanager: memilah notifikasi
+        ↓
+  InfraWatch Console + Grafana
+  (alarm, status, grafik)
+
+  Komponen utamanya:
+
+  - Docker Compose
+    Ibarat “manajer gedung”. Menjalankan semua aplikasi monitoring sebagai container agar mudah dipasang, dijalankan, dan dipindahkan.
+
+  - Node Exporter
+    Bertugas mengambil kondisi server: penggunaan CPU, RAM, disk, jaringan, dan sebagainya. Ibarat sensor kesehatan pada mesin.
+
+  - Blackbox Exporter
+    Mengecek apakah website bisa diakses dan merespons dengan baik. Ibarat bot yang rutin membuka website untuk memastikan website tidak down.
+
+  - Prometheus
+    Pusat pengumpulan data. Prometheus mengambil data dari sensor setiap sekitar 2 detik, menyimpan riwayatnya, lalu mengevaluasi aturan alert. Contohnya:
+    “CPU di atas 95%” atau “website tidak bisa diakses”.
+
+  - Alertmanager
+    Pengatur notifikasi. Saat Prometheus menemukan masalah, Alertmanager mengelompokkan alert dan mencegah notifikasi berlebihan. Misalnya, jika server
+    benar-benar mati, alert CPU/RAM tidak perlu ikut membanjirkan dashboard.
+
+  - InfraWatch Console (Python Flask)
+    Dashboard utama buatan sendiri di localhost:5000. Menampilkan kondisi live, daftar website yang dipantau, riwayat insiden, serta alarm suara dan
+    indikator merah saat ada masalah kritis. Website target juga bisa ditambah atau dihapus dari dashboard.
+
+  - Grafana
+    Menampilkan data dalam bentuk grafik dan dashboard yang lebih visual, misalnya tren CPU, RAM, disk, dan status website dari waktu ke waktu.
+
+  - Nginx
+    Contoh website/web server yang dipantau oleh sistem. Dalam implementasi nyata, ini bisa diganti atau ditambah dengan website produksi.
+
+  Kalimat singkat untuk presentasi:
+
+  > “Sistem ini bekerja seperti pusat keamanan digital. Sensor mengambil kondisi server dan website, Prometheus menganalisis data tersebut secara real-time,
+  > Alertmanager menyaring peringatan, lalu Grafana dan InfraWatch menampilkan kondisi serta membunyikan alarm jika ada gangguan.”
+
+  Nilai utamanya: masalah seperti website down, CPU terlalu tinggi, RAM penuh, atau disk hampir habis dapat dideteksi cepat—sekitar hitungan detik—sebelum
+  berdampak lebih besar ke pengguna.
+
+---
+
 # Fitur Utama (v2 Enterprise Edition)
 
 - **⚡ Ultra-Responsive Alerting**: Evaluasi rule interval dipercepat dari 30s ke **5s**, serta window rate dipercepat ke `[1m]` dan `irate()`. Deteksi gangguan terjadi dalam **10–30 detik** (sebelumnya 5–7 menit).
